@@ -1,0 +1,6 @@
+# Игнорировать CMake файлы
+CMakeLists.txt.user
+CMakeLists.txt
+
+# Игнорировать директорию сборки
+build/
