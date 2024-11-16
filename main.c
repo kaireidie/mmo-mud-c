@@ -96,7 +96,8 @@ void CheckOpcode(int fd, char *buff){
         vhod(fd, received_packet);
     }
     else{
-        printf("OPCODE != 1 || 2 or error");
+        printf("OPCODE ERROR\n");
+        close(fd);
     }
 }
 
