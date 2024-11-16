@@ -15,15 +15,15 @@
 
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
-void resp(struct RESPONSE *response) {
-
-    send(123, response, sizeof(struct RESPONSE), 0);
+void resp(int fd, struct RESPONSE *response) {
+    printf("отправляю пакет с ответом\n");
+    send(fd, response, sizeof(struct RESPONSE), 0);
 
 }
 
 
 
-void reg(struct PACKET *received_packet){
+void reg(int fd, struct PACKET *received_packet){
     printf("REG\n");
     printf("Opcode: %u\n", received_packet->opcode);
     printf("Login: %s\n", received_packet->login);
@@ -48,15 +48,26 @@ void reg(struct PACKET *received_packet){
                                             received_packet->login, received_packet->hash);
 
     mysql_query(conn, query);
-
-    mysql_close(conn);
+    if (mysql_query(conn, query)) {
+        fprintf(stderr, "INSERT failed: %s\n", mysql_error(conn));
+        struct RESPONSE response;
+        response.opcode = OP_ERROR;
+        resp(fd, &response);
+        mysql_close(conn);
+    } else {
+        printf("Query executed successfully\n");
+        struct RESPONSE response;
+        response.opcode = OP_USER_REGISTER_SUCCESS;
+        resp(fd, &response);
+        mysql_close(conn);
+    }
 }
 
 
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
 
-void vhod(struct PACKET *received_packet){
+void vhod(int fd, struct PACKET *received_packet){
     printf("VHOD\n");
     printf("Opcode: %u\n", received_packet->opcode);
     printf("Login: %s\n", received_packet->login);
@@ -74,15 +85,15 @@ void vhod(struct PACKET *received_packet){
 
 
 // Пришел пакет проверяем опкод
-void CheckOpcode(char *buff){
+void CheckOpcode(int fd, char *buff){
     struct PACKET *received_packet = (struct PACKET *)buff;
     if (received_packet->opcode == OP_USER_REGISTER){
         //printPacket(received_packet);
-        reg(received_packet);
+        reg(fd, received_packet);
     }
     else if (received_packet->opcode == OP_USER_LOGIN){
         //printPacket(received_packet);
-        vhod(received_packet);
+        vhod(fd, received_packet);
     }
     else{
         printf("OPCODE != 1 || 2 or error");
@@ -140,7 +151,7 @@ int main () {
                 int bytes_received = recv(events[i].data.fd, buff, BUFFSIZE, 0);    //
                 if (bytes_received > 0) {                                           //
                     printf("Получено сообщение\n");
-                    CheckOpcode(buff);                                              // Если пришел пакет проверяем опкод
+                    CheckOpcode(events[i].data.fd, buff);                                              // Если пришел пакет проверяем опкод
 
                 }else if (bytes_received == 0) {                                    //  Если байтов пришло 0 то клиент отключился
                     printf("Клиент отключился.\n");                                 //

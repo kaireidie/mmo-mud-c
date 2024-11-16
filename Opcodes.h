@@ -6,6 +6,7 @@ enum Opcodes {
     OP_USER_LOGIN                                   = 0x002,
 
     OP_USER_REGISTER_SUCCESS                        = 0x100,
+    OP_USER_LOGIN_SUCCESS                           = 0x101,
 
     OP_USER_REGISTER_LOGIN_TAKEN                    = 0x200,
 
