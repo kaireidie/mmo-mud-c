@@ -1,1 +1,0 @@
-/sbin/gcc -g CMakeFiles/serverc.dir/main.c.o -o serverc

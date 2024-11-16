@@ -1,7 +1,0 @@
-/home/kaireidie/qtproject/serverc/build/GCC-Debug/CMakeFiles/serverc.dir
-/home/kaireidie/qtproject/serverc/build/GCC-Debug/CMakeFiles/edit_cache.dir
-/home/kaireidie/qtproject/serverc/build/GCC-Debug/CMakeFiles/rebuild_cache.dir
-/home/kaireidie/qtproject/serverc/build/GCC-Debug/CMakeFiles/list_install_components.dir
-/home/kaireidie/qtproject/serverc/build/GCC-Debug/CMakeFiles/install.dir
-/home/kaireidie/qtproject/serverc/build/GCC-Debug/CMakeFiles/install/local.dir
-/home/kaireidie/qtproject/serverc/build/GCC-Debug/CMakeFiles/install/strip.dir
