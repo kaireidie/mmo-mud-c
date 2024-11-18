@@ -21,11 +21,18 @@ void resp(int fd, struct RESPONSE *response) {
 
 }
 
+
+/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+
+
 void error_client(int fd){
     struct RESPONSE response;
     response.opcode = OP_ERROR_CLIENT;
     resp(fd, &response);
 }
+
+/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+
 
 void reg(int fd, struct PACKET *received_packet){
     printf("REG\n");
@@ -89,6 +96,7 @@ void vhod(int fd, struct PACKET *received_packet){
 
 // Пришел пакет проверяем опкод
 void CheckOpcode(int fd, char *buff){
+    printf("FD = %d\n" ,fd);
     struct PACKET *received_packet = (struct PACKET *)buff;
     if (received_packet->opcode == OP_USER_REGISTER){
         reg(fd, received_packet);
@@ -97,8 +105,8 @@ void CheckOpcode(int fd, char *buff){
         vhod(fd, received_packet);
     }
     else{
-        printf("OPCODE ERROR\n");
         error_client(fd);
+        printf("PCODE ERROR\nОтключаю клиент %d\n",fd);
         close(fd);
     }
 }
@@ -127,7 +135,7 @@ int main () {
 
     /* EPOLL */
     int epoll_fd = epoll_create1(0);                                 /* Вы создаете новый экземпляр epoll, который будет использоваться для мониторинга событий на сокетах.                      */
-    /*                                                                                                                          */
+                                                                    /*                                                                                                                          */
     struct epoll_event sock = {                                    /*                                                                                                                          */
         .events = EPOLLIN,                                        /* Вы создаете событие sock для вашего сокета s и добавляете его в epoll для мониторинга событий EPOLLIN (входящие данные). */
         .data.fd = s,                                            /* (Вы создаете событие sock для вашего сокета s чтобы отслеживать входящие данные (EPOLLIN).                               */
@@ -157,7 +165,7 @@ int main () {
                     CheckOpcode(events[i].data.fd, buff);                                              // Если пришел пакет проверяем опкод
 
                 }else if (bytes_received == 0) {                                    //  Если байтов пришло 0 то клиент отключился
-                    printf("Клиент отключился.\n");                                 //
+                    printf("Клиент id %d отключился.\n", events[i].data.fd);        //
                     close(events[i].data.fd);                                       //
                 }                                                                   //
             }
