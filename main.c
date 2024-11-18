@@ -21,7 +21,11 @@ void resp(int fd, struct RESPONSE *response) {
 
 }
 
-
+void error_client(int fd){
+    struct RESPONSE response;
+    response.opcode = OP_ERROR_CLIENT;
+    resp(fd, &response);
+}
 
 void reg(int fd, struct PACKET *received_packet){
     printf("REG\n");
@@ -47,7 +51,6 @@ void reg(int fd, struct PACKET *received_packet){
     sprintf(query, "INSERT INTO users (login, password_hash) VALUES ('%s', TO_BASE64('%s'));",
                                             received_packet->login, received_packet->hash);
 
-    mysql_query(conn, query);
     if (mysql_query(conn, query)) {
         fprintf(stderr, "INSERT failed: %s\n", mysql_error(conn));
         struct RESPONSE response;
@@ -88,15 +91,14 @@ void vhod(int fd, struct PACKET *received_packet){
 void CheckOpcode(int fd, char *buff){
     struct PACKET *received_packet = (struct PACKET *)buff;
     if (received_packet->opcode == OP_USER_REGISTER){
-        //printPacket(received_packet);
         reg(fd, received_packet);
     }
     else if (received_packet->opcode == OP_USER_LOGIN){
-        //printPacket(received_packet);
         vhod(fd, received_packet);
     }
     else{
         printf("OPCODE ERROR\n");
+        error_client(fd);
         close(fd);
     }
 }
@@ -120,7 +122,7 @@ int main () {
     listen(s, SOMAXCONN);
 
 
-    /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
 
     /* EPOLL */

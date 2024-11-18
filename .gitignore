@@ -4,3 +4,5 @@ CMakeLists.txt
 
 # Игнорировать директорию сборки
 build/
+
+.gitignore

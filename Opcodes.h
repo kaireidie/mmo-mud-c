@@ -11,6 +11,8 @@ enum Opcodes {
     OP_USER_REGISTER_LOGIN_TAKEN                    = 0x200,
 
     OP_ERROR                                        = 0x666,
+
+    OP_ERROR_CLIENT                                 = 0x777,
 };
 
 #endif // OPCODES_H
