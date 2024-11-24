@@ -14,6 +14,8 @@ enum Opcodes {
     OP_ERROR                                        = 0x666,
 
     OP_ERROR_CLIENT                                 = 0x777,
+
+    OP_SPAWN_CHARACTER                              = 0x010,
 };
 
 #endif // OPCODES_H

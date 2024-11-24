@@ -10,75 +10,60 @@
 
 #include "Opcodes.h"
 #include "Packet.h"
+#include "engine.h"
 
 #define BUFFSIZE 1024
 #define MAX_EVENTS 10
 
-/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-
-void resp(int fd, struct RESPONSE *response) {
-    printf("отправляю пакет с ответом\n");
-    send(fd, response, sizeof(struct RESPONSE), 0);
-
+void resp(int fd, Response *response) {
+    printf("Отправляю пакет с ответом\n");
+    send(fd, response, sizeof(Response), 0);
 }
 
-
-/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-
-
-void error_client(int fd){
-    struct RESPONSE response;
+void error_client(int fd) {
+    Response response;
+    printf("Отправляю пакет с ошибкой\n");
     response.opcode = OP_ERROR_CLIENT;
     resp(fd, &response);
 }
 
-/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-
-
-void reg(int fd, struct PACKET *received_packet){
+void reg(int fd, Packet *received_packet) {
     printf("REG\n");
     printf("Opcode: %u\n", received_packet->opcode);
     printf("Login: %s\n", received_packet->login);
 
     printf("Hash: ");
-    for (int i = 0; i < 64; i++)
-    {
+    for (int i = 0; i < 64; i++) {
         printf("%02x", received_packet->hash[i]);
     }
     printf("\n");
     printf("\n-------------------------------------------\n");
 
-    MYSQL *conn;
-    MYSQL_RES *res;
-    MYSQL_ROW row;
-    conn = mysql_init(NULL);
+    MYSQL *conn = mysql_init(NULL);
     mysql_real_connect(conn, "127.0.0.1", "root", "root", "db", 3306, NULL, 0);
 
-    // Формируем запрос с использованием TO_BASE64()
-    char query[512];  // Увеличиваем размер буфера для SQL-запроса
-    sprintf(query, "INSERT INTO users (login, password_hash) VALUES ('%s', '%s');", //('%s', TO_BASE64('%s'));",
-                                            received_packet->login, received_packet->hash);
-    printf("SQL Query: %s\n", query); //s
+    char query[512];
+    snprintf(query, sizeof(query),
+             "INSERT INTO users (login, password_hash) VALUES ('%s', '%s');",
+             received_packet->login, received_packet->hash);
+
+    printf("SQL Query: %s\n", query);
     if (mysql_query(conn, query)) {
         fprintf(stderr, "INSERT failed: %s\n", mysql_error(conn));
-        struct RESPONSE response;
+        Response response;
         response.opcode = OP_ERROR;
         resp(fd, &response);
         mysql_close(conn);
     } else {
         printf("Query executed successfully\n");
-        struct RESPONSE response;
+        Response response;
         response.opcode = OP_USER_REGISTER_SUCCESS;
         resp(fd, &response);
         mysql_close(conn);
     }
 }
 
-
-/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-
-
-void vhod(int fd, struct PACKET *received_packet){
+void vhod(int fd, Packet *received_packet) {
     printf("VHOD\n");
     printf("Opcode: %u\n", received_packet->opcode);
     printf("Login: %s\n", received_packet->login);
@@ -89,79 +74,63 @@ void vhod(int fd, struct PACKET *received_packet){
     }
     printf("\n-------------------------------------------\n");
 
-    MYSQL *conn;
-    MYSQL_RES *res;
-    MYSQL_ROW row;
-    conn = mysql_init(NULL);
+    MYSQL *conn = mysql_init(NULL);
     mysql_real_connect(conn, "127.0.0.1", "root", "root", "db", 3306, NULL, 0);
 
-    // Формируем запрос с использованием TO_BASE64()
-    char query[512];  // Увеличиваем размер буфера для SQL-запроса
+    char query[512];
     snprintf(query, sizeof(query),
-            "SELECT EXISTS(SELECT 1 FROM users WHERE login='%s' AND password_hash=TRIM('%s'))", //TRIM
-            received_packet->login, received_packet->hash);
-    printf("SQL Query: %02x\n", query); //s
+             "SELECT EXISTS(SELECT 1 FROM users WHERE login='%s' AND password_hash=TRIM('%s'))",
+             received_packet->login, received_packet->hash);
+
+    printf("SQL Query: %s\n", query);
     if (mysql_query(conn, query)) {
-        fprintf(stderr, "INSERT failed: %s\n", mysql_error(conn));
-        struct RESPONSE response;
+        fprintf(stderr, "SELECT failed: %s\n", mysql_error(conn));
+        Response response;
         response.opcode = OP_ERROR;
         resp(fd, &response);
         mysql_close(conn);
     } else {
-        printf("Query executed successfully\n");
-        res = mysql_store_result(conn);
-        row = mysql_fetch_row(res);
+        MYSQL_RES *res = mysql_store_result(conn);
+        MYSQL_ROW row = mysql_fetch_row(res);
+
         if (row) {
-            for (int i = 0; i < mysql_num_fields(res); i++) {
-                if (row[i] != NULL) {
-                    printf("row[%d] = %s\n", i, row[i]);
-                } else {
-                    printf("row[%d] = NULL\n", i);
-                }
-            }
-            int exists = atoi(row[0]);  // Преобразуем результат в число
+            int exists = atoi(row[0]);
             if (exists) {
                 printf("Пользователь существует.\n");
+                Response response;
+                response.opcode = OP_USER_LOGIN_SUCCESS;
+                resp(fd, &response);
+                engine(fd, received_packet);
             } else {
                 printf("Пользователь не существует.\n");
+                Response response;
+                response.opcode = OP_USER_LOGIN_FAILED;
+                resp(fd, &response);
             }
-
         }
 
+        mysql_free_result(res);
     }
 
-    mysql_free_result(res);
     mysql_close(conn);
 }
 
+void CheckOpcode(int fd, char *buff) {
+    printf("FD = %d\n", fd);
+    Packet *received_packet = (Packet *)buff;
 
-/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-
-
-// Пришел пакет проверяем опкод
-void CheckOpcode(int fd, char *buff){
-    printf("FD = %d\n" ,fd);
-    struct PACKET *received_packet = (struct PACKET *)buff;
-    if (received_packet->opcode == OP_USER_REGISTER){
+    if (received_packet->opcode == OP_USER_REGISTER) {
         reg(fd, received_packet);
-    }
-    else if (received_packet->opcode == OP_USER_LOGIN){
+    } else if (received_packet->opcode == OP_USER_LOGIN) {
         vhod(fd, received_packet);
-    }
-    else{
+    } else {
         error_client(fd);
-        printf("PCODE ERROR\nОтключаю клиент %d\n",fd);
+        printf("OPCODE ERROR\nОтключаю клиент %d\n", fd);
         close(fd);
     }
 }
 
-
-/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-
-
-int main () {
-
-    /* SOCKET */
+int main() {
     int s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
     struct sockaddr_in ad = {
@@ -173,49 +142,38 @@ int main () {
     bind(s, (struct sockaddr *)&ad, sizeof(ad));
     listen(s, SOMAXCONN);
 
+    int epoll_fd = epoll_create1(0);
+    struct epoll_event sock = {
+        .events = EPOLLIN,
+        .data.fd = s,
+    };
+    epoll_ctl(epoll_fd, EPOLL_CTL_ADD, s, &sock);
 
-/*--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-
-
-    /* EPOLL */
-    int epoll_fd = epoll_create1(0);                                 /* Вы создаете новый экземпляр epoll, который будет использоваться для мониторинга событий на сокетах.                      */
-                                                                    /*                                                                                                                          */
-    struct epoll_event sock = {                                    /*                                                                                                                          */
-        .events = EPOLLIN,                                        /* Вы создаете событие sock для вашего сокета s и добавляете его в epoll для мониторинга событий EPOLLIN (входящие данные). */
-        .data.fd = s,                                            /* (Вы создаете событие sock для вашего сокета s чтобы отслеживать входящие данные (EPOLLIN).                               */
-    };                                                          /*                                                                                                                          */
-    epoll_ctl(epoll_fd, EPOLL_CTL_ADD, s, &sock);              /*Сокет добавляется в epoll с помощью epoll_ctl.                                                                            */
-
-
-    /* CYCLE */
-    struct epoll_event events[MAX_EVENTS];                   /* Массив структур для хранения информации о событиях для их оброботки в цикле */
+    struct epoll_event events[MAX_EVENTS];
     while (1) {
-        int event_count = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);             /*Бесконечный цикл, в котором epoll_wait блокируется, ожидая события от зарегистрированных сокетов.*/
-        /*Когда событие происходит, оно сохраняется в массиве events.*/
-        for (int i = 0; i < event_count; i++) {                                     //
-            if (events[i].data.fd == s) {                                           //
-                int a = accept(s, NULL, NULL);                                      //
-                    //
-                struct epoll_event client_event = {                                 //
-                    .events = EPOLLIN,                                              //  Если событие связано с серверным сокетом (s), вызывается accept, чтобы принять новое соединение.
-                    .data.fd = a,                                                   //  Новый сокет (a) добавляется в epoll для отслеживания событий.
-                };                                                                  //  Если событие связано с клиентским сокетом, данные считываются в буфер buff с помощью recv, и,
-                epoll_ctl(epoll_fd, EPOLL_CTL_ADD, a, &client_event);               //  если данные были получены, они выводятся на экран. После этого сокет закрывается.
-            } else {                                                                //
-                char buff[BUFFSIZE];                                                //
-                int bytes_received = recv(events[i].data.fd, buff, BUFFSIZE, 0);    //
-                if (bytes_received > 0) {                                           //
+        int event_count = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
+        for (int i = 0; i < event_count; i++) {
+            if (events[i].data.fd == s) {
+                int a = accept(s, NULL, NULL);
+                struct epoll_event client_event = {
+                    .events = EPOLLIN,
+                    .data.fd = a,
+                };
+                epoll_ctl(epoll_fd, EPOLL_CTL_ADD, a, &client_event);
+            } else {
+                char buff[BUFFSIZE];
+                int bytes_received = recv(events[i].data.fd, buff, BUFFSIZE, 0);
+                if (bytes_received > 0) {
                     printf("Получено сообщение\n");
-                    CheckOpcode(events[i].data.fd, buff);                                              // Если пришел пакет проверяем опкод
-
-                }else if (bytes_received == 0) {                                    //  Если байтов пришло 0 то клиент отключился
-                    printf("Клиент id %d отключился.\n", events[i].data.fd);        //
-                    close(events[i].data.fd);                                       //
-                }                                                                   //
+                    CheckOpcode(events[i].data.fd, buff);
+                } else if (bytes_received == 0) {
+                    printf("Клиент id %d отключился.\n", events[i].data.fd);
+                    close(events[i].data.fd);
+                }
             }
         }
     }
 
-    close(epoll_fd);                                                                //закрытие епула
+    close(epoll_fd);
     close(s);
 }
