@@ -1,5 +1,6 @@
 #include <stdio.h>
-
+#include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -55,9 +56,9 @@ void reg(int fd, struct PACKET *received_packet){
 
     // Формируем запрос с использованием TO_BASE64()
     char query[512];  // Увеличиваем размер буфера для SQL-запроса
-    sprintf(query, "INSERT INTO users (login, password_hash) VALUES ('%s', TO_BASE64('%s'));",
+    sprintf(query, "INSERT INTO users (login, password_hash) VALUES ('%s', '%s');", //('%s', TO_BASE64('%s'));",
                                             received_packet->login, received_packet->hash);
-
+    printf("SQL Query: %s\n", query); //s
     if (mysql_query(conn, query)) {
         fprintf(stderr, "INSERT failed: %s\n", mysql_error(conn));
         struct RESPONSE response;
@@ -88,6 +89,49 @@ void vhod(int fd, struct PACKET *received_packet){
     }
     printf("\n-------------------------------------------\n");
 
+    MYSQL *conn;
+    MYSQL_RES *res;
+    MYSQL_ROW row;
+    conn = mysql_init(NULL);
+    mysql_real_connect(conn, "127.0.0.1", "root", "root", "db", 3306, NULL, 0);
+
+    // Формируем запрос с использованием TO_BASE64()
+    char query[512];  // Увеличиваем размер буфера для SQL-запроса
+    snprintf(query, sizeof(query),
+            "SELECT EXISTS(SELECT 1 FROM users WHERE login='%s' AND password_hash=TRIM('%s'))", //TRIM
+            received_packet->login, received_packet->hash);
+    printf("SQL Query: %02x\n", query); //s
+    if (mysql_query(conn, query)) {
+        fprintf(stderr, "INSERT failed: %s\n", mysql_error(conn));
+        struct RESPONSE response;
+        response.opcode = OP_ERROR;
+        resp(fd, &response);
+        mysql_close(conn);
+    } else {
+        printf("Query executed successfully\n");
+        res = mysql_store_result(conn);
+        row = mysql_fetch_row(res);
+        if (row) {
+            for (int i = 0; i < mysql_num_fields(res); i++) {
+                if (row[i] != NULL) {
+                    printf("row[%d] = %s\n", i, row[i]);
+                } else {
+                    printf("row[%d] = NULL\n", i);
+                }
+            }
+            int exists = atoi(row[0]);  // Преобразуем результат в число
+            if (exists) {
+                printf("Пользователь существует.\n");
+            } else {
+                printf("Пользователь не существует.\n");
+            }
+
+        }
+
+    }
+
+    mysql_free_result(res);
+    mysql_close(conn);
 }
 
 
