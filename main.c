@@ -15,6 +15,14 @@
 #define BUFFSIZE 1024
 #define MAX_EVENTS 10
 
+void acceptWorld(int fd, WorldPacket *worldPacket){
+    printf("Отправляю пакет с апрувом на клиент\n");
+    send(fd, worldPacket, sizeof(WorldPacket), 0); //for debug client
+    sleep(2); //for debug client
+    send(fd, worldPacket, sizeof(WorldPacket), 0);
+
+}
+
 void resp(int fd, Response *response) {
     printf("Отправляю пакет с ответом\n");
     send(fd, response, sizeof(Response), 0);
@@ -97,10 +105,16 @@ void vhod(int fd, Packet *received_packet) {
             int exists = atoi(row[0]);
             if (exists) {
                 printf("Пользователь существует.\n");
-                Response response;
-                response.opcode = OP_USER_LOGIN_SUCCESS;
-                resp(fd, &response);
-                engine(fd, received_packet);
+                WorldPacket worldPacket;
+                worldPacket.opcode = OP_USER_LOGIN_SUCCESS;
+
+                strncpy(worldPacket.ip_addres, "127.0.0.1", sizeof(worldPacket.ip_addres) - 1);
+                worldPacket.ip_addres[sizeof(worldPacket.ip_addres) - 1] = '\0';
+
+                worldPacket.port = 12344;
+                worldPacket.severid = 1101;
+
+                acceptWorld(fd, &worldPacket);
             } else {
                 printf("Пользователь не существует.\n");
                 Response response;

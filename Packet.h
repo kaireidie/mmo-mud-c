@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+
+
 typedef struct {
     uint32_t opcode;
     char login[20];
@@ -17,5 +19,12 @@ typedef struct {
 typedef struct {
     uint32_t opcode;
 } Response;
+
+typedef struct {
+    uint32_t opcode;
+    uint32_t severid;
+    char ip_addres[16];
+    uint16_t port;
+} WorldPacket;
 
 #endif // PACKET_H
